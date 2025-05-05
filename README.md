@@ -17,7 +17,7 @@ A HTTP RESTful bridge for MikroTik RouterOS API (compatible with RouterOS 6 and 
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/mikrotik-api-bridge.git
+git clone https://github.com/joanesmarti/mikrotik-api-bridge.git
 cd mikrotik-api-bridge
 ```
 
