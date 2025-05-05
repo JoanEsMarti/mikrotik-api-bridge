@@ -3,6 +3,17 @@ const winston = require('winston');
 const config = require('./config');
 const MikrotikClient = require('./mikrotik');
 
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1);
+});
+
 // Configure logger
 const logger = winston.createLogger({
   level: 'info',
@@ -16,7 +27,62 @@ const logger = winston.createLogger({
 });
 
 const app = express();
-app.use(express.json());
+
+// Error handling middleware
+const errorHandler = (err, req, res, next) => {
+  logger.error({
+    message: 'Server error',
+    error: err.message,
+    stack: err.stack
+  });
+  res.status(500).json({
+    success: false,
+    data: 'Internal server error'
+  });
+};
+
+// Request logging middleware
+app.use((req, res, next) => {
+  logger.info({
+    message: 'Incoming request',
+    method: req.method,
+    path: req.path,
+    headers: req.headers,
+    body: req.body
+  });
+  next();
+});
+
+// JSON parsing with error handling
+app.use(express.json({
+  verify: (req, res, buf) => {
+    try {
+      JSON.parse(buf);
+    } catch (e) {
+      res.status(400).json({
+        success: false,
+        data: 'Invalid JSON payload'
+      });
+      throw new Error('Invalid JSON');
+    }
+  }
+}));
+
+// Add response time header
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.info({
+      message: 'Request completed',
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      duration: `${duration}ms`
+    });
+  });
+  next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -62,7 +128,42 @@ app.post('/api/mikrotik', async (req, res) => {
   }
 });
 
+// Register error handler after all routes
+app.use(errorHandler);
+
 // Start the server
-app.listen(config.PORT, () => {
-  logger.info(`Server running on port ${config.PORT}`);
-});
+try {
+  const server = app.listen(config.PORT, '0.0.0.0', () => {
+    logger.info({
+      message: 'Server started successfully',
+      port: config.PORT,
+      address: server.address(),
+      env: process.env.NODE_ENV || 'development'
+    });
+  });
+
+  server.on('error', (error) => {
+    logger.error('Server error:', error);
+    process.exit(1);
+  });
+
+  // Log all available network interfaces
+  const os = require('os');
+  const networkInterfaces = os.networkInterfaces();
+  logger.info({
+    message: 'Network interfaces',
+    interfaces: networkInterfaces
+  });
+
+  // Handle graceful shutdown
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM received. Shutting down gracefully...');
+    server.close(() => {
+      logger.info('Server closed');
+      process.exit(0);
+    });
+  });
+} catch (error) {
+  logger.error('Failed to start server:', error);
+  process.exit(1);
+}
