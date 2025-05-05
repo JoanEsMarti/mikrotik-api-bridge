@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mikrotik-api-bridge:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      # Optional default connection parameters
+      # - MIKROTIK_HOST=192.168.88.1
+      # - MIKROTIK_PORT=8728
+      # - MIKROTIK_USER=admin
+      # - MIKROTIK_PASS=password
+      - CONNECTION_TIMEOUT=10000
+      - COMMAND_TIMEOUT=30000
+    restart: unless-stopped
