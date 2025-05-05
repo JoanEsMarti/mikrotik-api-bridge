@@ -8,10 +8,16 @@ services:
     environment:
       - PORT=3000
       # Optional default connection parameters
-      # - MIKROTIK_HOST=192.168.88.1
-      # - MIKROTIK_PORT=8728
-      # - MIKROTIK_USER=admin
-      # - MIKROTIK_PASS=password
+      - MIKROTIK_HOST=192.168.88.1
+      - MIKROTIK_PORT=8728
+      - MIKROTIK_USER=admin
+      - MIKROTIK_PASS=password
       - CONNECTION_TIMEOUT=10000
       - COMMAND_TIMEOUT=30000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped
